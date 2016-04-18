@@ -1,0 +1,61 @@
+---
+title: "Predicting the quality of execution of a weight lifting exercise"
+author: "Sander Diks"
+date: "17 April 2016"
+output: html_document
+---
+
+# Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly (Class A) and incorrectly in 4 different ways (Class B-E).
+
+In this report we try to predict the Class using the data obtained from the the sensors. We also provide information on; choice of prediction algorithm, cross validation and the expected out of sample error. Furthermore, we use our model to predict 20 different test cases.
+
+The data used in this report was kindly provided by:
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har#ixzz467sZFPVX
+
+# Preprocessing and cleaning data
+
+First the training and test case set will be downloaded and read into R, together with the "caret"" library. When using the summary function, we noticed many columns containing no usable information. Hence we trimmed the dataset, removed all columns not required for the predicition.
+```{r}
+library(caret)
+trainurl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(trainurl, destfile = "pml-training.csv")
+rawtrainset <- read.csv("pml-training.csv", na.strings = c("NA", "", "#DIV/0!"))
+trainset <- rawtrainset[,colSums(is.na(rawtrainset)) == 0]
+cleantrainset <- trainset[,c(8:length(trainset))] # removing first 7 columns
+testcaseurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(testcaseurl, destfile = "pml-testing.csv")
+rawtestcase <- read.csv("pml-testing.csv", na.strings = c("NA", "", "#DIV/0!"))
+testcase <- rawtestcase[,colSums(is.na(rawtestcase)) == 0]
+cleantestcase <- testcase[,c(8:length(testcase))] # removing first 7 columns
+```
+This removed more than a hunderd columns, leaving only 53 columns. The training set contains 19622 observations and the testing set 20.
+
+# Generating prediction model
+
+Next, we split the training set in a training and testing set
+```{r}
+set.seed(17042016)
+inTrain <- createDataPartition(trainset$classe, p=0.70, list=F)
+traindata <- cleantrainset[inTrain, ]
+testdata <- cleantrainset[-inTrain, ]
+```
+We decided to use random forrest combined with cross validation as this one of the most used/accurate algorithms abeit its slowness.
+```{r}
+modeltrain <- train(classe ~ ., data=traindata, method="rf", trControl = trainControl(method = "cv", 5), ntree = 200)  #using 5 fold-cross validation and number of trees of 200 due to time constrains.
+modeltrain
+```
+This model performed well with an accuracy of 99.2%. Next, we used the training model on the test set.
+```{r}
+predicttest <- predict(modeltrain, testdata)
+confusionMatrix(testdata$classe, predicttest)
+```
+The confusionmatrix show an accuracy of 98.9% on the test data set. The out-of-sample error (or out-of-Bag error) can be estimated as 1-accuracy and is therefore 1.1% 
+
+The last step is to predict the Classes from 20 test cases.
+```{r}
+predictontest <- predict(modeltrain, cleantestcase[, -length(cleantestcase)]) # remove last column for prediction
+predictontest
+```
+
